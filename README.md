@@ -1,16 +1,18 @@
-# React + Vite
+Haulwise Logistics Performance Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Haulwise is a delivery performance analytics platform for logistics operations teams. It brings shipment health, bottleneck stages, carrier performance, and actionable delivery exceptions into one control-tower workflow.
 
-Currently, two official plugins are available:
+## Mock UX Design
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+[Open the public Mock UX](https://github.com/Gouthaman-007/Logistic-Company/blob/feature/mock-ux-design/docs/MOCK-UX.md)
 
-## React Compiler
+This Mock UX communicates the application's primary screens, navigation flow, and major user journeys before backend implementation. It covers morning exception triage, bottleneck investigation, and weekly carrier review.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Run locally
 
-## Expanding the ESLint configuration
+```bash
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Build for production with `npm run build`.
