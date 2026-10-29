@@ -1,16 +1,32 @@
-# React + Vite
+# Haulwise Logistics Performance Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Project idea
 
-Currently, two official plugins are available:
+Haulwise is a delivery performance analytics platform for logistics operations teams. It brings shipment health, bottleneck stages, carrier performance, and actionable delivery exceptions into one control-tower workflow so teams can identify delays early and coordinate follow-up.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Capstone day-by-day plan
 
-## React Compiler
+| Day | Planned work |
+| --- | --- |
+| 1 | Confirm the problem, target users, project scope, and success criteria. |
+| 2 | Finalize the user journeys, screen layouts, and navigation flow. |
+| 3 | Define shipment, carrier, and exception data models; prepare representative sample data. |
+| 4 | Build the operations overview with delivery KPIs, performance trends, and bottleneck insights. |
+| 5 | Implement shipment search and the exception and carrier workflows. |
+| 6 | Test key user journeys, handle loading, empty, and error states, and refine responsive layouts. |
+| 7 | Fix issues, document setup and outcomes, and prepare the project for demonstration. |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Mock UX Design
 
-## Expanding the ESLint configuration
+[View the Mock UX design](https://github.com/Gouthaman-007/Logistic-Company/blob/feature/mock-ux-design/docs/MOCK-UX.md)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The mock UX outlines Haulwise's primary screens, navigation, and operational user journeys. It covers exception triage, bottleneck investigation, carrier review, and shipment lookup.
+
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+Build for production with `npm run build`.
