@@ -68,8 +68,40 @@ describe('MongoDB shipment read and write flow', () => {
     assert.equal(detailResponse.body.data.carrier.name, 'DHL Freight')
     assert.ok(Array.isArray(detailResponse.body.data.trackingEvents))
 
+    const eventResponse = await request(app)
+      .post('/api/shipments/SHP-REAL-1/events')
+      .send({
+        stage: 'delivered',
+        description: 'Delivered to receiving desk',
+        location: 'Lyon',
+        occurredAt: '2026-10-30T12:00:00.000Z',
+      })
+
+    assert.equal(eventResponse.status, 201)
+    assert.equal(eventResponse.body.data.status, 'delivered')
+    assert.equal(eventResponse.body.data.currentStage, 'delivered')
+    assert.equal(eventResponse.body.data.trackingEvents.length, 1)
+
+    const updatedShipment = await Shipment.findOne({
+      trackingNumber: 'SHP-REAL-1',
+    }).lean()
+    assert.equal(updatedShipment.status, 'delivered')
+    assert.equal(updatedShipment.actualDelivery.toISOString(), '2026-10-30T12:00:00.000Z')
+
     const invalidResponse = await request(app).get('/api/shipments/%3Cscript%3E')
     assert.equal(invalidResponse.status, 400)
+  })
+
+  it('rejects tracking events for unknown shipments', async () => {
+    const response = await request(app)
+      .post('/api/shipments/SHP-UNKNOWN/events')
+      .send({
+        stage: 'pickup',
+        description: 'Collected',
+        occurredAt: '2026-10-30T12:00:00.000Z',
+      })
+
+    assert.equal(response.status, 404)
   })
 
   it('rejects duplicate tracking numbers without overwriting the saved record', async () => {

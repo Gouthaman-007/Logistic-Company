@@ -207,6 +207,30 @@ function App() {
     }
   }
 
+  async function addTrackingEvent(trackingNumber, event) {
+    const response = await fetch(
+      `/api/shipments/${encodeURIComponent(trackingNumber)}/events`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(event),
+      },
+    )
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Could not save tracking event.')
+    }
+
+    setSelectedShipment(result.data)
+    setShipments((current) =>
+      current.map((shipment) =>
+        shipment.id === trackingNumber ? toShipmentRow(result.data) : shipment,
+      ),
+    )
+    setNotice(`Tracking event saved for ${trackingNumber}.`)
+  }
+
   const filteredShipments = useMemo(() => {
     const query = search.trim().toLowerCase()
 
@@ -282,6 +306,7 @@ function App() {
                   loadShipmentDetails(trackingNumber)
                 }
               }}
+              onAddEvent={addTrackingEvent}
             />
           )}
           <ShipmentTable

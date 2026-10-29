@@ -769,6 +769,52 @@
   color: #87958e;
 }
 
+.tracking-event-form {
+  padding-top: 15px;
+  margin-top: 16px;
+  border-top: 1px solid #eef2ef;
+}
+
+.tracking-event-form h3 {
+  margin: 0 0 12px;
+  color: #52635c;
+  font-size: 11px;
+}
+
+.tracking-event-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tracking-event-fields label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: #7d8b84;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.tracking-event-fields input,
+.tracking-event-fields select {
+  width: 100%;
+  min-width: 0;
+  height: 33px;
+  padding: 0 7px;
+  border: 1px solid #e1e8e4;
+  border-radius: 6px;
+  background: #fff;
+  color: #43564e;
+  font-size: 10px;
+}
+
+.event-form-error {
+  margin: 10px 0 0;
+  color: #a4503e;
+  font-size: 10px;
+}
+
 .shipment-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1236,6 +1282,10 @@ td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .tracking-event-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .tracking-events li {
     grid-template-columns: 1fr 1fr;
     gap: 7px;
@@ -1251,6 +1301,10 @@ td {
     }
 
     .shipment-details-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .tracking-event-fields {
       grid-template-columns: 1fr;
     }
   }

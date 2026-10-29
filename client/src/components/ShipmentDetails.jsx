@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 function formatDate(value) {
   const date = new Date(value)
 
@@ -8,7 +10,45 @@ function formatDate(value) {
   return date.toLocaleString()
 }
 
-function ShipmentDetails({ shipment, isLoading, error, onClose, onRetry }) {
+function ShipmentDetails({
+  shipment,
+  isLoading,
+  error,
+  onClose,
+  onRetry,
+  onAddEvent,
+}) {
+  const [isSavingEvent, setIsSavingEvent] = useState(false)
+  const [eventError, setEventError] = useState('')
+  const [defaultEventDate] = useState(() => {
+    const date = new Date()
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+    return date.toISOString().slice(0, 16)
+  })
+
+  async function handleEventSubmit(event) {
+    event.preventDefault()
+    setIsSavingEvent(true)
+    setEventError('')
+
+    const form = event.currentTarget
+    const formData = new FormData(form)
+
+    try {
+      await onAddEvent(shipment.trackingNumber, {
+        stage: formData.get('stage'),
+        description: formData.get('description'),
+        location: formData.get('location'),
+        occurredAt: new Date(formData.get('occurredAt')).toISOString(),
+      })
+      form.reset()
+    } catch (requestError) {
+      setEventError(requestError.message || 'Could not save tracking event.')
+    } finally {
+      setIsSavingEvent(false)
+    }
+  }
+
   return (
     <section
       className="panel shipment-details-panel"
@@ -92,6 +132,54 @@ function ShipmentDetails({ shipment, isLoading, error, onClose, onRetry }) {
               <p>No tracking events have been recorded yet.</p>
             )}
           </div>
+          <form className="tracking-event-form" onSubmit={handleEventSubmit}>
+            <h3>Add tracking event</h3>
+            <div className="tracking-event-fields">
+              <label>
+                Stage
+                <select defaultValue={shipment.currentStage} name="stage" required>
+                  <option value="pickup">Pickup</option>
+                  <option value="origin_handling">Origin handling</option>
+                  <option value="linehaul">Linehaul</option>
+                  <option value="customs">Customs</option>
+                  <option value="last_mile">Last mile</option>
+                  <option value="delivered">Delivered</option>
+                </select>
+              </label>
+              <label>
+                Description
+                <input
+                  autoComplete="off"
+                  maxLength="500"
+                  name="description"
+                  required
+                />
+              </label>
+              <label>
+                Location
+                <input autoComplete="off" maxLength="120" name="location" />
+              </label>
+              <label>
+                Event date and time
+                <input
+                  defaultValue={defaultEventDate}
+                  name="occurredAt"
+                  type="datetime-local"
+                  required
+                />
+              </label>
+            </div>
+            {eventError && (
+              <p className="event-form-error" role="alert">
+                {eventError}
+              </p>
+            )}
+            <div className="form-actions">
+              <button className="form-submit" disabled={isSavingEvent} type="submit">
+                {isSavingEvent ? 'Saving…' : 'Save tracking event'}
+              </button>
+            </div>
+          </form>
         </>
       )}
     </section>
