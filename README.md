@@ -4,9 +4,9 @@ Haulwise is a delivery performance analytics platform for logistics operations t
 
 ## Mock UX Design
 
-[Open the public Mock UX](https://github.com/Gouthaman-007/Logistic-Company/blob/feature/mock-ux-design/docs/MOCK-UX.md)
+[View the Mock UX design](https://github.com/Gouthaman-007/Logistic-Company/blob/feature/mock-ux-design/docs/MOCK-UX.md)
 
-This Mock UX communicates the application's primary screens, navigation flow, and major user journeys before backend implementation. It covers morning exception triage, bottleneck investigation, and weekly carrier review.
+This mock UX communicates the application's primary screens, navigation flow, and major user journeys before backend implementation. It covers exception triage, bottleneck investigation, carrier review, and shipment lookup.
 
 ## Run locally
 
