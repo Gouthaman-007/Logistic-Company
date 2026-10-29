@@ -9,14 +9,16 @@ const carrier = { _id: carrierId, name: 'DHL Freight', code: 'DHLF' }
 let app
 let createdPayload
 let shipmentQuery
+let shipmentLookup
 let carrierQuery
 
-function createQuery(result) {
+function createQuery(result, selectedFields) {
   return {
     populate() {
       return this
     },
-    select() {
+    select(fields) {
+      selectedFields?.push(fields)
       return this
     },
     sort() {
@@ -35,7 +37,7 @@ before(() => {
     CarrierModel: {
       find(filter) {
         carrierQuery = { filter }
-        return createQuery([carrier])
+        return createQuery([carrier], carrierQuery.selectedFields ??= [])
       },
       findOne: async (filter) => (filter.isActive ? carrier : null),
     },
@@ -49,6 +51,20 @@ before(() => {
             carrier,
           },
         ])
+      },
+      findOne(filter) {
+        shipmentLookup = { filter }
+        if (filter.trackingNumber === 'SHP-99999') {
+          return createQuery(null)
+        }
+
+        return createQuery({
+          trackingNumber: filter.trackingNumber,
+          customer: 'Northstar Retail',
+          route: { origin: 'Rotterdam', destination: 'Lyon' },
+          carrier: { ...carrier, contactEmail: 'freight@example.com' },
+          trackingEvents: [],
+        })
       },
       async create(payload) {
         createdPayload = payload
@@ -101,6 +117,25 @@ describe('Database-backed shipment API', () => {
 
     assert.equal(response.status, 400)
     assert.match(response.body.error, /Invalid shipment status/)
+  })
+
+  it('reads one shipment by normalized tracking number', async () => {
+    const response = await request(app).get('/api/shipments/shp-10482')
+
+    assert.equal(response.status, 200)
+    assert.deepEqual(shipmentLookup.filter, { trackingNumber: 'SHP-10482' })
+    assert.equal(response.body.data.customer, 'Northstar Retail')
+    assert.equal(response.body.data.carrier.contactEmail, 'freight@example.com')
+  })
+
+  it('rejects invalid and unknown shipment tracking numbers', async () => {
+    const invalidResponse = await request(app).get('/api/shipments/%3Cscript%3E')
+    assert.equal(invalidResponse.status, 400)
+
+    const missingResponse = await request(app).get('/api/shipments/SHP-99999')
+
+    assert.equal(missingResponse.status, 404)
+    assert.match(missingResponse.body.error, /Shipment not found/)
   })
 
   it('writes a shipment linked to an active carrier', async () => {

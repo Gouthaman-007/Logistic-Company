@@ -48,6 +48,8 @@ safely.
 - `GET /api/health` reports API and database connection status.
 - `GET /api/carriers` reads active carriers.
 - `GET /api/shipments` reads shipments and populates carrier details.
+- `GET /api/shipments/:trackingNumber` reads a shipment and its carrier and
+  tracking events.
 - `POST /api/shipments` validates and writes a shipment to MongoDB.
 
 Run API tests with `npm run test:api`. They verify route validation against
@@ -56,3 +58,6 @@ temporary MongoDB instance; the first run downloads the MongoDB test binary.
 
 Run the schema suite with `npm run test:models`, lint with `npm run lint`, and
 build the client with `npm --prefix client run build`.
+
+The shipment table's **View** action uses the shipment detail endpoint. Use
+**Add shipment** to write a shipment through the API.

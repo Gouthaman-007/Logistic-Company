@@ -60,6 +60,16 @@ describe('MongoDB shipment read and write flow', () => {
     assert.equal(readResponse.body.data.length, 1)
     assert.equal(readResponse.body.data[0].trackingNumber, 'SHP-REAL-1')
     assert.equal(readResponse.body.data[0].carrier.code, 'DHLF')
+
+    const detailResponse = await request(app).get('/api/shipments/shp-real-1')
+
+    assert.equal(detailResponse.status, 200)
+    assert.equal(detailResponse.body.data.customer, 'Northstar Retail')
+    assert.equal(detailResponse.body.data.carrier.name, 'DHL Freight')
+    assert.ok(Array.isArray(detailResponse.body.data.trackingEvents))
+
+    const invalidResponse = await request(app).get('/api/shipments/%3Cscript%3E')
+    assert.equal(invalidResponse.status, 400)
   })
 
   it('rejects duplicate tracking numbers without overwriting the saved record', async () => {
@@ -79,5 +89,12 @@ describe('MongoDB shipment read and write flow', () => {
       trackingNumber: 'SHP-REAL-1',
     }).lean()
     assert.equal(savedShipment.customer, 'Northstar Retail')
+  })
+
+  it('returns not found when a tracking number is not in MongoDB', async () => {
+    const response = await request(app).get('/api/shipments/SHP-UNKNOWN')
+
+    assert.equal(response.status, 404)
+    assert.deepEqual(response.body, { error: 'Shipment not found.' })
   })
 })
