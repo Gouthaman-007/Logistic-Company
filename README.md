@@ -1,16 +1,30 @@
-# React + Vite
+# Haulwise Logistics Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Haulwise is a delivery performance dashboard for monitoring shipments, carrier
+performance, and logistics bottlenecks.
 
-Currently, two official plugins are available:
+## Database models
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Mongoose models are defined in `server/models`:
 
-## React Compiler
+- `Carrier` stores carrier identifiers, contact details, service coverage, and
+  performance metrics.
+- `Shipment` stores customer and route details, delivery status and dates,
+  tracking events, and a reference to its carrier.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Schemas validate required fields, enums, and metric ranges. Shipment indexes
+support status/ETA and carrier/ETA lookups. Run the schema validation tests
+without connecting to a database:
 
-## Expanding the ESLint configuration
+```bash
+npm run test:models
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Run the dashboard
+
+```bash
+npm install
+npm run dev
+```
+
+Build and lint the frontend with `npm run build` and `npm run lint`.
