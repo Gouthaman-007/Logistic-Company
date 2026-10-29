@@ -4,7 +4,13 @@ function StatusBadge({ status }) {
   return <span className={`status-badge ${statusClass}`}>{status}</span>
 }
 
-function ShipmentTable({ shipments, search, onSearchChange }) {
+function ShipmentTable({
+  shipments,
+  search,
+  onSearchChange,
+  isLoading,
+  onAddShipment,
+}) {
   return (
     <section className="panel shipments-panel" aria-labelledby="shipments-title">
       <div className="panel-heading shipments-heading">
@@ -12,8 +18,9 @@ function ShipmentTable({ shipments, search, onSearchChange }) {
           <h2 id="shipments-title">Exceptions needing attention</h2>
           <p>Prioritized by customer impact and delay risk</p>
         </div>
-        <button className="view-all-button" type="button">
-          View all exceptions <span aria-hidden="true">→</span>
+        <button className="add-shipment-button" type="button" onClick={onAddShipment}>
+          <span aria-hidden="true">＋</span>
+          Add shipment
         </button>
       </div>
 
@@ -51,7 +58,7 @@ function ShipmentTable({ shipments, search, onSearchChange }) {
             </tr>
           </thead>
           <tbody>
-            {shipments.map((shipment) => (
+            {!isLoading && shipments.map((shipment) => (
               <tr key={shipment.id}>
                 <td className="shipment-cell">
                   <strong>{shipment.id}</strong>
@@ -78,7 +85,14 @@ function ShipmentTable({ shipments, search, onSearchChange }) {
                 </td>
               </tr>
             ))}
-            {shipments.length === 0 && (
+            {isLoading && (
+              <tr>
+                <td className="empty-state" colSpan="8" role="status">
+                  Loading shipments…
+                </td>
+              </tr>
+            )}
+            {!isLoading && shipments.length === 0 && (
               <tr>
                 <td className="empty-state" colSpan="8">
                   No shipments match “{search}”.

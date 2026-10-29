@@ -20,11 +20,39 @@ without connecting to a database:
 npm run test:models
 ```
 
-## Run the dashboard
+## Database-backed API
+
+Copy `.env.example` to `.env` and set `MONGODB_URI` to a MongoDB database you
+can access. Keep `.env` private; it is ignored by Git.
+
+Install the root API dependencies and seed the database:
 
 ```bash
+npm install
+npm run seed
+npm run dev:server
+```
+
+In another terminal, start the Vite app from `client`:
+
+```bash
+cd client
 npm install
 npm run dev
 ```
 
-Build and lint the frontend with `npm run build` and `npm run lint`.
+The API listens on port `3001` by default. Vite proxies `/api` requests to it.
+The seed script upserts example carriers and shipments and can be run again
+safely.
+
+- `GET /api/health` reports API and database connection status.
+- `GET /api/carriers` reads active carriers.
+- `GET /api/shipments` reads shipments and populates carrier details.
+- `POST /api/shipments` validates and writes a shipment to MongoDB.
+
+Run API tests with `npm run test:api`. They verify route validation against
+injected models and exercise the connection, reads, and writes against a
+temporary MongoDB instance; the first run downloads the MongoDB test binary.
+
+Run the schema suite with `npm run test:models`, lint with `npm run lint`, and
+build the client with `npm --prefix client run build`.
