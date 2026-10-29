@@ -10,6 +10,7 @@ function ShipmentTable({
   onSearchChange,
   isLoading,
   onAddShipment,
+  onViewShipment,
 }) {
   return (
     <section className="panel shipments-panel" aria-labelledby="shipments-title">
@@ -78,9 +79,10 @@ function ShipmentTable({
                   <button
                     className="row-action"
                     type="button"
-                    aria-label={`More actions for ${shipment.id}`}
+                    aria-label={`View details for ${shipment.id}`}
+                    onClick={() => onViewShipment(shipment.id)}
                   >
-                    ···
+                    View
                   </button>
                 </td>
               </tr>

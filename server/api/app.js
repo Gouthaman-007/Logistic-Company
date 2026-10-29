@@ -84,6 +84,24 @@ export function createApp({
     response.json({ data: shipments })
   })
 
+  app.get('/api/shipments/:trackingNumber', async (request, response) => {
+    const trackingNumber = request.params.trackingNumber.trim().toUpperCase()
+
+    if (!/^[A-Z0-9-]{3,40}$/.test(trackingNumber)) {
+      throw createHttpError(400, 'Invalid shipment tracking number.')
+    }
+
+    const shipment = await ShipmentModel.findOne({ trackingNumber })
+      .populate('carrier', 'name code contactEmail')
+      .lean()
+
+    if (!shipment) {
+      throw createHttpError(404, 'Shipment not found.')
+    }
+
+    response.json({ data: shipment })
+  })
+
   app.post('/api/shipments', async (request, response) => {
     const {
       trackingNumber,

@@ -5,6 +5,7 @@ import DeliveryPerformance from './components/DeliveryPerformance'
 import MetricCard from './components/MetricCard'
 import PageHeading from './components/PageHeading'
 import Sidebar from './components/Sidebar'
+import ShipmentDetails from './components/ShipmentDetails'
 import ShipmentTable from './components/ShipmentTable'
 import Topbar from './components/Topbar'
 import './App.css'
@@ -107,6 +108,9 @@ function App() {
   const [carriers, setCarriers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [selectedShipment, setSelectedShipment] = useState(null)
+  const [isDetailsLoading, setIsDetailsLoading] = useState(false)
+  const [detailsError, setDetailsError] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -178,6 +182,31 @@ function App() {
     }
   }
 
+  async function loadShipmentDetails(trackingNumber) {
+    setSelectedShipment(null)
+    setDetailsError('')
+    setIsDetailsLoading(true)
+
+    try {
+      const response = await fetch(
+        `/api/shipments/${encodeURIComponent(trackingNumber)}`,
+      )
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not load shipment details.')
+      }
+
+      setSelectedShipment(result.data)
+    } catch (requestError) {
+      setDetailsError(
+        requestError.message || 'Could not connect to the dashboard API.',
+      )
+    } finally {
+      setIsDetailsLoading(false)
+    }
+  }
+
   const filteredShipments = useMemo(() => {
     const query = search.trim().toLowerCase()
 
@@ -238,6 +267,23 @@ function App() {
               onSubmit={createShipment}
             />
           )}
+          {(isDetailsLoading || selectedShipment || detailsError) && (
+            <ShipmentDetails
+              shipment={selectedShipment}
+              isLoading={isDetailsLoading}
+              error={detailsError}
+              onClose={() => {
+                setSelectedShipment(null)
+                setDetailsError('')
+              }}
+              onRetry={() => {
+                const trackingNumber = selectedShipment?.trackingNumber
+                if (trackingNumber) {
+                  loadShipmentDetails(trackingNumber)
+                }
+              }}
+            />
+          )}
           <ShipmentTable
             shipments={filteredShipments}
             search={search}
@@ -247,6 +293,7 @@ function App() {
               setNotice('')
               setIsCreateOpen(true)
             }}
+            onViewShipment={loadShipmentDetails}
           />
           <footer className="page-footer">
             <span className={`system-status${error ? ' system-error' : ''}`}>
