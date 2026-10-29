@@ -1,121 +1,102 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { useMemo, useState } from 'react'
+import BottleneckPanel from './components/BottleneckPanel'
+import DeliveryPerformance from './components/DeliveryPerformance'
+import MetricCard from './components/MetricCard'
+import PageHeading from './components/PageHeading'
+import Sidebar from './components/Sidebar'
+import ShipmentTable from './components/ShipmentTable'
+import Topbar from './components/Topbar'
+import { shipments } from './data/shipments'
 import './App.css'
 
+const metrics = [
+  {
+    label: 'On-time delivery',
+    value: '92.4%',
+    detail: '3.2% vs previous period',
+    trend: 'up',
+    icon: '↗',
+  },
+  {
+    label: 'Shipments in transit',
+    value: '1,284',
+    detail: '86 arriving today',
+    trend: 'neutral',
+    icon: '↗',
+  },
+  {
+    label: 'Exceptions to resolve',
+    value: '12',
+    detail: '4 since yesterday',
+    trend: 'warning',
+    icon: '!',
+  },
+  {
+    label: 'Avg. transit time',
+    value: '2.8 days',
+    detail: '0.4 days vs previous period',
+    trend: 'down',
+    icon: '◷',
+  },
+]
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [activeItem, setActiveItem] = useState('Overview')
+  const [search, setSearch] = useState('')
+
+  const filteredShipments = useMemo(() => {
+    const query = search.trim().toLowerCase()
+
+    if (!query) {
+      return shipments
+    }
+
+    return shipments.filter((shipment) =>
+      [
+        shipment.id,
+        shipment.customer,
+        shipment.route,
+        shipment.carrier,
+        shipment.status,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+    )
+  }, [search])
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app-shell">
+      <Sidebar activeItem={activeItem} onNavigate={setActiveItem} />
+      <main className="main-content">
+        <Topbar activeItem={activeItem} />
+        <div className="content-wrap">
+          <PageHeading />
+          <section className="metric-grid" aria-label="Delivery metrics">
+            {metrics.map((metric) => (
+              <MetricCard key={metric.label} {...metric} />
+            ))}
+          </section>
+          <section className="overview-grid" aria-label="Network performance">
+            <DeliveryPerformance />
+            <BottleneckPanel />
+          </section>
+          <ShipmentTable
+            shipments={filteredShipments}
+            search={search}
+            onSearchChange={setSearch}
+          />
+          <footer className="page-footer">
+            <span className="system-status">
+              <i aria-hidden="true" />
+              All systems operational
+            </span>
+            <span>Data synced 4 minutes ago</span>
+            <a href="mailto:support@haulwise.example">Contact support</a>
+          </footer>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </main>
+    </div>
   )
 }
 
