@@ -51,6 +51,8 @@ safely.
 - `GET /api/shipments/:trackingNumber` reads a shipment and its carrier and
   tracking events.
 - `POST /api/shipments` validates and writes a shipment to MongoDB.
+- `POST /api/shipments/:trackingNumber/events` appends a validated tracking
+  event and advances the shipment's current stage.
 
 Run API tests with `npm run test:api`. They verify route validation against
 injected models and exercise the connection, reads, and writes against a
@@ -60,4 +62,5 @@ Run the schema suite with `npm run test:models`, lint with `npm run lint`, and
 build the client with `npm --prefix client run build`.
 
 The shipment table's **View** action uses the shipment detail endpoint. Use
-**Add shipment** to write a shipment through the API.
+**Add shipment** to write a shipment through the API, or add an event in shipment
+details to record its progress.

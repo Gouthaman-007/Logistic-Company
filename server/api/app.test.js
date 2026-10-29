@@ -10,6 +10,7 @@ let app
 let createdPayload
 let shipmentQuery
 let shipmentLookup
+let shipmentUpdate
 let carrierQuery
 
 function createQuery(result, selectedFields) {
@@ -65,6 +66,20 @@ before(() => {
           carrier: { ...carrier, contactEmail: 'freight@example.com' },
           trackingEvents: [],
         })
+      },
+      findOneAndUpdate(filter, update, options) {
+        shipmentUpdate = { filter, update, options }
+        return {
+          populate: async () => ({
+            trackingNumber: filter.trackingNumber,
+            currentStage: update.$set.currentStage,
+            status: update.$set.status ?? 'at_risk',
+            trackingEvents: update.$push.trackingEvents
+              ? [update.$push.trackingEvents]
+              : [],
+            carrier,
+          }),
+        }
       },
       async create(payload) {
         createdPayload = payload
@@ -163,5 +178,36 @@ describe('Database-backed shipment API', () => {
     assert.equal(response.status, 400)
     assert.match(response.body.error, /are required/)
     assert.equal(createdPayload.trackingNumber, 'SHP-10501')
+  })
+
+  it('appends a tracking event and advances the current shipment stage', async () => {
+    const input = {
+      stage: 'customs',
+      description: 'Customs documents approved',
+      location: 'Lyon',
+      occurredAt: '2026-10-30T12:00:00.000Z',
+    }
+    const response = await request(app)
+      .post('/api/shipments/shp-10482/events')
+      .send(input)
+
+    assert.equal(response.status, 201)
+    assert.deepEqual(shipmentUpdate.filter, { trackingNumber: 'SHP-10482' })
+    assert.equal(shipmentUpdate.update.$push.trackingEvents.stage, 'customs')
+    assert.equal(shipmentUpdate.update.$set.currentStage, 'customs')
+    assert.deepEqual(shipmentUpdate.options, {
+      returnDocument: 'after',
+      runValidators: true,
+    })
+    assert.equal(response.body.data.trackingEvents[0].location, 'Lyon')
+  })
+
+  it('rejects invalid tracking event payloads', async () => {
+    const response = await request(app)
+      .post('/api/shipments/SHP-10482/events')
+      .send({ stage: 'teleport', description: '', occurredAt: 'not-a-date' })
+
+    assert.equal(response.status, 400)
+    assert.match(response.body.error, /valid stage/)
   })
 })

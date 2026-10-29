@@ -9,6 +9,14 @@ const shipmentStatuses = [
   'delivered',
   'cancelled',
 ]
+const shipmentStages = [
+  'pickup',
+  'origin_handling',
+  'linehaul',
+  'customs',
+  'last_mile',
+  'delivered',
+]
 const maximumShipments = 100
 
 function escapeRegex(value) {
@@ -100,6 +108,58 @@ export function createApp({
     }
 
     response.json({ data: shipment })
+  })
+
+  app.post('/api/shipments/:trackingNumber/events', async (request, response) => {
+    const trackingNumber = request.params.trackingNumber.trim().toUpperCase()
+    const { stage, description, location, occurredAt } = request.body ?? {}
+
+    if (!/^[A-Z0-9-]{3,40}$/.test(trackingNumber)) {
+      throw createHttpError(400, 'Invalid shipment tracking number.')
+    }
+
+    if (
+      !shipmentStages.includes(stage) ||
+      !validString(description) ||
+      (location !== undefined && typeof location !== 'string') ||
+      !validString(occurredAt) ||
+      Number.isNaN(Date.parse(occurredAt))
+    ) {
+      throw createHttpError(
+        400,
+        'A valid stage, description, and event date are required. Location must be a string.',
+      )
+    }
+
+    const eventDate = new Date(occurredAt)
+    const update = {
+      $push: {
+        trackingEvents: {
+          stage,
+          description: description.trim(),
+          ...(location?.trim() ? { location: location.trim() } : {}),
+          occurredAt: eventDate,
+        },
+      },
+      $set: {
+        currentStage: stage,
+        ...(stage === 'delivered'
+          ? { status: 'delivered', actualDelivery: eventDate }
+          : {}),
+      },
+    }
+
+    const shipment = await ShipmentModel.findOneAndUpdate(
+      { trackingNumber },
+      update,
+      { returnDocument: 'after', runValidators: true },
+    ).populate('carrier', 'name code contactEmail')
+
+    if (!shipment) {
+      throw createHttpError(404, 'Shipment not found.')
+    }
+
+    response.status(201).json({ data: shipment })
   })
 
   app.post('/api/shipments', async (request, response) => {

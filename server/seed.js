@@ -100,7 +100,7 @@ async function seedDatabase() {
       const carrier = await Carrier.findOneAndUpdate(
         { code: carrierRecord.code },
         { $set: carrierRecord },
-        { new: true, upsert: true, runValidators: true },
+        { returnDocument: 'after', upsert: true, runValidators: true },
       )
       carriers.set(carrierRecord.code, carrier._id)
     }
@@ -117,7 +117,7 @@ async function seedDatabase() {
             estimatedDelivery: new Date(Date.now() + 24 * 60 * 60 * 1000),
           },
         },
-        { new: true, upsert: true, runValidators: true },
+        { returnDocument: 'after', upsert: true, runValidators: true },
       )
     }
 
