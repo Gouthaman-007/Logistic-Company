@@ -108,6 +108,7 @@ function App() {
   const [carriers, setCarriers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [shipmentToEdit, setShipmentToEdit] = useState(null)
   const [selectedShipment, setSelectedShipment] = useState(null)
   const [isDetailsLoading, setIsDetailsLoading] = useState(false)
   const [detailsError, setDetailsError] = useState('')
@@ -179,6 +180,99 @@ function App() {
       setNotice(`Shipment ${result.data.trackingNumber} was saved.`)
     } catch (requestError) {
       setError(requestError.message || 'Could not create shipment.')
+    }
+  }
+
+  async function editShipment(trackingNumber) {
+    setError('')
+    setNotice('')
+    setSelectedShipment(null)
+    setIsDetailsLoading(true)
+    setDetailsError('')
+
+    try {
+      const response = await fetch(
+        `/api/shipments/${encodeURIComponent(trackingNumber)}`,
+      )
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not load shipment details.')
+      }
+
+      setShipmentToEdit(result.data)
+    } catch (requestError) {
+      setError(requestError.message || 'Could not load shipment details.')
+    } finally {
+      setIsDetailsLoading(false)
+    }
+  }
+
+  async function updateShipment(trackingNumber, values) {
+    setError('')
+    setNotice('')
+
+    try {
+      const response = await fetch(
+        `/api/shipments/${encodeURIComponent(trackingNumber)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(values),
+        },
+      )
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not update shipment.')
+      }
+
+      setShipments((current) =>
+        current.map((shipment) =>
+          shipment.id === trackingNumber ? toShipmentRow(result.data) : shipment,
+        ),
+      )
+      setSelectedShipment((current) =>
+        current?.trackingNumber === trackingNumber ? result.data : current,
+      )
+      setShipmentToEdit(null)
+      setNotice(`Shipment ${trackingNumber} was updated.`)
+    } catch (requestError) {
+      setError(requestError.message || 'Could not update shipment.')
+    }
+  }
+
+  async function deleteShipment(trackingNumber) {
+    if (!window.confirm(`Delete shipment ${trackingNumber}? This cannot be undone.`)) {
+      return
+    }
+
+    setError('')
+    setNotice('')
+
+    try {
+      const response = await fetch(
+        `/api/shipments/${encodeURIComponent(trackingNumber)}`,
+        { method: 'DELETE' },
+      )
+      const result = response.status === 204 ? null : await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not delete shipment.')
+      }
+
+      setShipments((current) =>
+        current.filter((shipment) => shipment.id !== trackingNumber),
+      )
+      setSelectedShipment((current) =>
+        current?.trackingNumber === trackingNumber ? null : current,
+      )
+      setShipmentToEdit((current) =>
+        current?.trackingNumber === trackingNumber ? null : current,
+      )
+      setNotice(`Shipment ${trackingNumber} was deleted.`)
+    } catch (requestError) {
+      setError(requestError.message || 'Could not delete shipment.')
     }
   }
 
@@ -287,8 +381,21 @@ function App() {
           {isCreateOpen && (
             <CreateShipmentForm
               carriers={carriers}
-              onCancel={() => setIsCreateOpen(false)}
+              onCancel={() => {
+                setIsCreateOpen(false)
+                setNotice('')
+              }}
               onSubmit={createShipment}
+            />
+          )}
+          {shipmentToEdit && (
+            <CreateShipmentForm
+              carriers={carriers}
+              onCancel={() => setShipmentToEdit(null)}
+              onSubmit={(values) =>
+                updateShipment(shipmentToEdit.trackingNumber, values)
+              }
+              shipment={shipmentToEdit}
             />
           )}
           {(isDetailsLoading || selectedShipment || detailsError) && (
@@ -316,9 +423,12 @@ function App() {
             isLoading={isLoading}
             onAddShipment={() => {
               setNotice('')
+              setShipmentToEdit(null)
               setIsCreateOpen(true)
             }}
             onViewShipment={loadShipmentDetails}
+            onEditShipment={editShipment}
+            onDeleteShipment={deleteShipment}
           />
           <footer className="page-footer">
             <span className={`system-status${error ? ' system-error' : ''}`}>

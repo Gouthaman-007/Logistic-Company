@@ -1,14 +1,26 @@
 import { useState } from 'react'
 
-function CreateShipmentForm({ carriers, onCancel, onSubmit }) {
+function toLocalDateTime(value) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.valueOf())) {
+    return ''
+  }
+
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16)
+}
+
+function CreateShipmentForm({ carriers, onCancel, onSubmit, shipment = null }) {
   const [isSaving, setIsSaving] = useState(false)
+  const isEditing = Boolean(shipment)
 
   async function handleSubmit(event) {
     event.preventDefault()
 
     const formData = new FormData(event.currentTarget)
     const values = {
-      trackingNumber: formData.get('trackingNumber'),
       customer: formData.get('customer'),
       route: {
         origin: formData.get('origin'),
@@ -16,6 +28,10 @@ function CreateShipmentForm({ carriers, onCancel, onSubmit }) {
       },
       carrierId: formData.get('carrierId'),
       estimatedDelivery: new Date(formData.get('estimatedDelivery')).toISOString(),
+    }
+
+    if (!isEditing) {
+      values.trackingNumber = formData.get('trackingNumber')
     }
 
     setIsSaving(true)
@@ -31,8 +47,14 @@ function CreateShipmentForm({ carriers, onCancel, onSubmit }) {
     <section className="panel shipment-form-panel" aria-labelledby="create-shipment-title">
       <div className="panel-heading">
         <div>
-          <h2 id="create-shipment-title">Create shipment</h2>
-          <p>Save a shipment and its route to the database.</p>
+          <h2 id="create-shipment-title">
+            {isEditing ? `Edit shipment · ${shipment.trackingNumber}` : 'Create shipment'}
+          </h2>
+          <p>
+            {isEditing
+              ? 'Update shipment details in the database.'
+              : 'Save a shipment and its route to the database.'}
+          </p>
         </div>
         <button className="form-cancel" type="button" onClick={onCancel}>
           Cancel
@@ -45,32 +67,50 @@ function CreateShipmentForm({ carriers, onCancel, onSubmit }) {
         </p>
       ) : (
         <form className="shipment-form" onSubmit={handleSubmit}>
+          {!isEditing && (
+            <label>
+              Tracking number
+              <input
+                autoComplete="off"
+                maxLength="40"
+                minLength="3"
+                name="trackingNumber"
+                placeholder="SHP-10501"
+                required
+              />
+            </label>
+          )}
           <label>
-            Tracking number
+            Customer
             <input
-              autoComplete="off"
-              maxLength="40"
-              minLength="3"
-              name="trackingNumber"
-              placeholder="SHP-10501"
+              autoComplete="organization"
+              defaultValue={shipment?.customer ?? ''}
+              maxLength="120"
+              name="customer"
               required
             />
           </label>
           <label>
-            Customer
-            <input autoComplete="organization" maxLength="120" name="customer" required />
-          </label>
-          <label>
             Origin
-            <input maxLength="120" name="origin" required />
+            <input
+              defaultValue={shipment?.route.origin ?? ''}
+              maxLength="120"
+              name="origin"
+              required
+            />
           </label>
           <label>
             Destination
-            <input maxLength="120" name="destination" required />
+            <input
+              defaultValue={shipment?.route.destination ?? ''}
+              maxLength="120"
+              name="destination"
+              required
+            />
           </label>
           <label>
             Carrier
-            <select defaultValue="" name="carrierId" required>
+            <select defaultValue={shipment?.carrier?._id ?? ''} name="carrierId" required>
               <option disabled value="">
                 Select a carrier
               </option>
@@ -83,7 +123,12 @@ function CreateShipmentForm({ carriers, onCancel, onSubmit }) {
           </label>
           <label>
             Estimated delivery
-            <input name="estimatedDelivery" type="datetime-local" required />
+            <input
+              defaultValue={shipment ? toLocalDateTime(shipment.estimatedDelivery) : ''}
+              name="estimatedDelivery"
+              type="datetime-local"
+              required
+            />
           </label>
           <div className="form-actions">
             <button className="form-cancel" type="button" onClick={onCancel}>
@@ -94,7 +139,7 @@ function CreateShipmentForm({ carriers, onCancel, onSubmit }) {
               disabled={isSaving || carriers.length === 0}
               type="submit"
             >
-              {isSaving ? 'Saving…' : 'Save shipment'}
+              {isSaving ? 'Saving…' : isEditing ? 'Save changes' : 'Save shipment'}
             </button>
           </div>
         </form>
