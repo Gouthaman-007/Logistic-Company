@@ -51,6 +51,9 @@ safely.
 - `GET /api/shipments/:trackingNumber` reads a shipment and its carrier and
   tracking events.
 - `POST /api/shipments` validates and writes a shipment to MongoDB.
+- `PATCH /api/shipments/:trackingNumber` validates and updates a shipment's
+  customer, route, carrier, and estimated delivery.
+- `DELETE /api/shipments/:trackingNumber` deletes a shipment.
 - `POST /api/shipments/:trackingNumber/events` appends a validated tracking
   event and advances the shipment's current stage.
 
@@ -61,6 +64,7 @@ temporary MongoDB instance; the first run downloads the MongoDB test binary.
 Run the schema suite with `npm run test:models`, lint with `npm run lint`, and
 build the client with `npm --prefix client run build`.
 
-The shipment table's **View** action uses the shipment detail endpoint. Use
-**Add shipment** to write a shipment through the API, or add an event in shipment
-details to record its progress.
+The shipment table's **View**, **Edit**, and **Delete** actions use the
+shipment detail, update, and delete endpoints. Use **Add shipment** to write a
+shipment through the API, or add an event in shipment details to record its
+progress.

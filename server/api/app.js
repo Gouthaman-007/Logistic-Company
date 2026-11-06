@@ -214,6 +214,80 @@ export function createApp({
     response.status(201).json({ data: populatedShipment })
   })
 
+  app.patch('/api/shipments/:trackingNumber', async (request, response) => {
+    const trackingNumber = request.params.trackingNumber.trim().toUpperCase()
+    const { customer, route, carrierId, estimatedDelivery } = request.body ?? {}
+
+    if (!/^[A-Z0-9-]{3,40}$/.test(trackingNumber)) {
+      throw createHttpError(400, 'Invalid shipment tracking number.')
+    }
+
+    if (
+      !validString(customer) ||
+      !route ||
+      !validString(route.origin) ||
+      !validString(route.destination) ||
+      !validString(carrierId) ||
+      !validString(estimatedDelivery)
+    ) {
+      throw createHttpError(
+        400,
+        'Customer, route, carrier, and estimated delivery are required.',
+      )
+    }
+
+    if (!mongoose.isValidObjectId(carrierId)) {
+      throw createHttpError(400, 'Invalid carrier ID.')
+    }
+
+    const carrier = await CarrierModel.findOne({
+      _id: carrierId,
+      isActive: true,
+    })
+
+    if (!carrier) {
+      throw createHttpError(404, 'Active carrier not found.')
+    }
+
+    const shipment = await ShipmentModel.findOneAndUpdate(
+      { trackingNumber },
+      {
+        $set: {
+          customer,
+          route: {
+            origin: route.origin,
+            destination: route.destination,
+          },
+          carrier: carrier._id,
+          estimatedDelivery,
+        },
+      },
+      { returnDocument: 'after', runValidators: true },
+    ).populate('carrier', 'name code')
+
+    if (!shipment) {
+      throw createHttpError(404, 'Shipment not found.')
+    }
+
+    response.json({ data: shipment })
+  })
+
+  app.delete('/api/shipments/:trackingNumber', async (request, response) => {
+    const trackingNumber = request.params.trackingNumber.trim().toUpperCase()
+
+    if (!/^[A-Z0-9-]{3,40}$/.test(trackingNumber)) {
+      throw createHttpError(400, 'Invalid shipment tracking number.')
+    }
+
+    const shipment = await ShipmentModel.findOneAndDelete({ trackingNumber })
+
+    if (!shipment) {
+      throw createHttpError(404, 'Shipment not found.')
+    }
+
+    response.status(204).end()
+  })
+
   app.use((request, response) => {
     response.status(404).json({ error: 'API route not found.' })
   })

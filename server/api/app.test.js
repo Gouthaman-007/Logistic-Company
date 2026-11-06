@@ -11,6 +11,8 @@ let createdPayload
 let shipmentQuery
 let shipmentLookup
 let shipmentUpdate
+let shipmentEditUpdate
+let shipmentDeletion
 let carrierQuery
 
 function createQuery(result, selectedFields) {
@@ -68,18 +70,39 @@ before(() => {
         })
       },
       findOneAndUpdate(filter, update, options) {
-        shipmentUpdate = { filter, update, options }
-        return {
-          populate: async () => ({
-            trackingNumber: filter.trackingNumber,
-            currentStage: update.$set.currentStage,
-            status: update.$set.status ?? 'at_risk',
-            trackingEvents: update.$push.trackingEvents
-              ? [update.$push.trackingEvents]
-              : [],
-            carrier,
-          }),
+        if (update.$push) {
+          shipmentUpdate = { filter, update, options }
+        } else {
+          shipmentEditUpdate = { filter, update, options }
         }
+        return {
+          populate: async () => {
+            if (filter.trackingNumber === 'SHP-99999') {
+              return null
+            }
+
+            return {
+              trackingNumber: filter.trackingNumber,
+              customer: update.$set.customer ?? 'Northstar Retail',
+              route: update.$set.route ?? {
+                origin: 'Rotterdam',
+                destination: 'Lyon',
+              },
+              currentStage: update.$set.currentStage,
+              status: update.$set.status ?? 'at_risk',
+              trackingEvents: update.$push?.trackingEvents
+                ? [update.$push.trackingEvents]
+                : [],
+              carrier,
+            }
+          },
+        }
+      },
+      async findOneAndDelete(filter) {
+        shipmentDeletion = { filter }
+        return filter.trackingNumber === 'SHP-99999'
+          ? null
+          : { trackingNumber: filter.trackingNumber }
       },
       async create(payload) {
         createdPayload = payload
@@ -178,6 +201,63 @@ describe('Database-backed shipment API', () => {
     assert.equal(response.status, 400)
     assert.match(response.body.error, /are required/)
     assert.equal(createdPayload.trackingNumber, 'SHP-10501')
+  })
+
+  it('updates shipment details using an active carrier', async () => {
+    const input = {
+      customer: 'Northstar Wholesale',
+      route: { origin: 'Rotterdam', destination: 'Paris' },
+      carrierId: carrierId.toString(),
+      estimatedDelivery: '2026-10-31T12:00:00.000Z',
+    }
+    const response = await request(app)
+      .patch('/api/shipments/shp-10482')
+      .send(input)
+
+    assert.equal(response.status, 200)
+    assert.deepEqual(shipmentEditUpdate.filter, {
+      trackingNumber: 'SHP-10482',
+    })
+    assert.deepEqual(shipmentEditUpdate.update.$set, {
+      customer: input.customer,
+      route: input.route,
+      carrier: carrierId,
+      estimatedDelivery: input.estimatedDelivery,
+    })
+    assert.deepEqual(shipmentEditUpdate.options, {
+      returnDocument: 'after',
+      runValidators: true,
+    })
+    assert.equal(response.body.data.customer, input.customer)
+  })
+
+  it('rejects invalid and unknown shipment updates', async () => {
+    const invalidResponse = await request(app)
+      .patch('/api/shipments/%3Cscript%3E')
+      .send({})
+    assert.equal(invalidResponse.status, 400)
+
+    const missingResponse = await request(app)
+      .patch('/api/shipments/SHP-99999')
+      .send({
+        customer: 'Northstar',
+        route: { origin: 'Rotterdam', destination: 'Paris' },
+        carrierId: carrierId.toString(),
+        estimatedDelivery: '2026-10-31T12:00:00.000Z',
+      })
+    assert.equal(missingResponse.status, 404)
+  })
+
+  it('deletes an existing shipment and returns not found for a missing one', async () => {
+    const response = await request(app).delete('/api/shipments/shp-10482')
+
+    assert.equal(response.status, 204)
+    assert.deepEqual(shipmentDeletion.filter, {
+      trackingNumber: 'SHP-10482',
+    })
+
+    const missingResponse = await request(app).delete('/api/shipments/SHP-99999')
+    assert.equal(missingResponse.status, 404)
   })
 
   it('appends a tracking event and advances the current shipment stage', async () => {

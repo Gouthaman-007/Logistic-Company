@@ -92,6 +92,38 @@ describe('MongoDB shipment read and write flow', () => {
     assert.equal(invalidResponse.status, 400)
   })
 
+  it('updates and deletes a shipment in MongoDB', async () => {
+    await Shipment.create({
+      trackingNumber: 'SHP-CRUD-1',
+      customer: 'Atlas Medical',
+      route: { origin: 'Rotterdam', destination: 'Berlin' },
+      carrier: carrier._id,
+      estimatedDelivery: '2026-10-30T12:00:00.000Z',
+    })
+
+    const updateResponse = await request(app)
+      .patch('/api/shipments/SHP-CRUD-1')
+      .send({
+        customer: 'Atlas Health',
+        route: { origin: 'Rotterdam', destination: 'Paris' },
+        carrierId: carrier._id.toString(),
+        estimatedDelivery: '2026-10-31T12:00:00.000Z',
+      })
+    assert.equal(updateResponse.status, 200)
+    assert.equal(updateResponse.body.data.customer, 'Atlas Health')
+
+    const savedShipment = await Shipment.findOne({
+      trackingNumber: 'SHP-CRUD-1',
+    }).lean()
+    assert.equal(savedShipment.route.destination, 'Paris')
+
+    const deleteResponse = await request(app).delete('/api/shipments/SHP-CRUD-1')
+    assert.equal(deleteResponse.status, 204)
+    const deletedReadResponse = await request(app)
+      .get('/api/shipments/SHP-CRUD-1')
+    assert.equal(deletedReadResponse.status, 404)
+  })
+
   it('rejects tracking events for unknown shipments', async () => {
     const response = await request(app)
       .post('/api/shipments/SHP-UNKNOWN/events')

@@ -11,6 +11,8 @@ function ShipmentTable({
   isLoading,
   onAddShipment,
   onViewShipment,
+  onEditShipment,
+  onDeleteShipment,
 }) {
   return (
     <section className="panel shipments-panel" aria-labelledby="shipments-title">
@@ -75,15 +77,33 @@ function ShipmentTable({
                 <td className={shipment.delay === '—' ? '' : 'delay-cell'}>
                   {shipment.delay}
                 </td>
-                <td>
-                  <button
-                    className="row-action"
-                    type="button"
-                    aria-label={`View details for ${shipment.id}`}
-                    onClick={() => onViewShipment(shipment.id)}
-                  >
-                    View
-                  </button>
+                <td className="shipment-actions-cell">
+                  <div className="shipment-row-actions">
+                    <button
+                      className="row-action"
+                      type="button"
+                      aria-label={`View details for ${shipment.id}`}
+                      onClick={() => onViewShipment(shipment.id)}
+                    >
+                      View
+                    </button>
+                    <button
+                      className="row-action"
+                      type="button"
+                      aria-label={`Edit ${shipment.id}`}
+                      onClick={() => onEditShipment(shipment.id)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="row-action row-action-danger"
+                      type="button"
+                      aria-label={`Delete ${shipment.id}`}
+                      onClick={() => onDeleteShipment(shipment.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
