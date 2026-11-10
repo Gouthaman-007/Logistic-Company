@@ -214,7 +214,7 @@ export function createApp({
     response.status(201).json({ data: populatedShipment })
   })
 
-  app.patch('/api/shipments/:trackingNumber', async (request, response) => {
+  const updateShipment = async (request, response) => {
     const trackingNumber = request.params.trackingNumber.trim().toUpperCase()
     const { customer, route, carrierId, estimatedDelivery } = request.body ?? {}
 
@@ -270,7 +270,10 @@ export function createApp({
     }
 
     response.json({ data: shipment })
-  })
+  }
+
+  app.put('/api/shipments/:trackingNumber', updateShipment)
+  app.patch('/api/shipments/:trackingNumber', updateShipment)
 
   app.delete('/api/shipments/:trackingNumber', async (request, response) => {
     const trackingNumber = request.params.trackingNumber.trim().toUpperCase()

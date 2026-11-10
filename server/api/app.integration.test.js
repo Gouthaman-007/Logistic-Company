@@ -102,7 +102,7 @@ describe('MongoDB shipment read and write flow', () => {
     })
 
     const updateResponse = await request(app)
-      .patch('/api/shipments/SHP-CRUD-1')
+      .put('/api/shipments/SHP-CRUD-1')
       .send({
         customer: 'Atlas Health',
         route: { origin: 'Rotterdam', destination: 'Paris' },

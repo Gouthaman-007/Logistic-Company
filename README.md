@@ -51,8 +51,9 @@ safely.
 - `GET /api/shipments/:trackingNumber` reads a shipment and its carrier and
   tracking events.
 - `POST /api/shipments` validates and writes a shipment to MongoDB.
-- `PATCH /api/shipments/:trackingNumber` validates and updates a shipment's
-  customer, route, carrier, and estimated delivery.
+- `PUT /api/shipments/:trackingNumber` validates and replaces a shipment's
+  customer, route, carrier, and estimated delivery. `PATCH` remains available
+  as a backward-compatible alias.
 - `DELETE /api/shipments/:trackingNumber` deletes a shipment.
 - `POST /api/shipments/:trackingNumber/events` appends a validated tracking
   event and advances the shipment's current stage.
