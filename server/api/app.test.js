@@ -6,7 +6,13 @@ import { createApp } from './app.js'
 
 const carrierId = new mongoose.Types.ObjectId()
 const carrier = { _id: carrierId, name: 'DHL Freight', code: 'DHLF' }
+const testUser = {
+  _id: new mongoose.Types.ObjectId(),
+  username: 'api-test',
+  verifyPassword: async (password) => password === 'correct-horse-battery',
+}
 let app
+let agent
 let createdPayload
 let shipmentQuery
 let shipmentLookup
@@ -14,6 +20,7 @@ let shipmentUpdate
 let shipmentEditUpdate
 let shipmentDeletion
 let carrierQuery
+const sessions = new Map()
 
 function createQuery(result, selectedFields) {
   return {
@@ -34,9 +41,39 @@ function createQuery(result, selectedFields) {
   }
 }
 
-before(() => {
+before(async () => {
   app = createApp({
     getDatabaseState: () => 1,
+    UserModel: {
+      async createWithPassword(username) {
+        return { ...testUser, username }
+      },
+      findOne(filter) {
+        return {
+          select: async () =>
+            filter.username === testUser.username ? testUser : null,
+        }
+      },
+    },
+    SessionModel: {
+      async create(session) {
+        sessions.set(session.tokenHash, { ...session, user: testUser })
+        return session
+      },
+      findOne(filter) {
+        return {
+          populate: async () => {
+            const session = sessions.get(filter.tokenHash)
+            return session && session.expiresAt > new Date() ? session : null
+          },
+        }
+      },
+      async findOneAndDelete(filter) {
+        const session = sessions.get(filter.tokenHash)
+        sessions.delete(filter.tokenHash)
+        return session ?? null
+      },
+    },
     CarrierModel: {
       find(filter) {
         carrierQuery = { filter }
@@ -115,11 +152,38 @@ before(() => {
       },
     },
   })
+  agent = request.agent(app)
+  const registration = await agent
+    .post('/api/auth/register')
+    .send({ username: 'api-test', password: 'correct-horse-battery' })
+  assert.equal(registration.status, 201)
 })
 
 describe('Database-backed shipment API', () => {
+  it('requires authentication and exposes the signed-in user', async () => {
+    const anonymousResponse = await request(app).get('/api/shipments')
+    assert.equal(anonymousResponse.status, 401)
+
+    const response = await agent.get('/api/auth/me')
+    assert.equal(response.status, 200)
+    assert.deepEqual(response.body.data, {
+      id: testUser._id.toString(),
+      username: 'api-test',
+    })
+  })
+
+  it('rejects invalid credentials without creating a session', async () => {
+    const response = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'api-test', password: 'wrong-password' })
+
+    assert.equal(response.status, 401)
+    assert.deepEqual(response.body, { error: 'Invalid username or password.' })
+    assert.equal(response.headers['set-cookie'], undefined)
+  })
+
   it('reports database connection status', async () => {
-    const response = await request(app).get('/api/health')
+    const response = await agent.get('/api/health')
 
     assert.equal(response.status, 200)
     assert.deepEqual(response.body, {
@@ -129,7 +193,7 @@ describe('Database-backed shipment API', () => {
   })
 
   it('reads active carriers from the carrier model', async () => {
-    const response = await request(app).get('/api/carriers')
+    const response = await agent.get('/api/carriers')
 
     assert.equal(response.status, 200)
     assert.deepEqual(carrierQuery.filter, { isActive: true })
@@ -137,7 +201,7 @@ describe('Database-backed shipment API', () => {
   })
 
   it('reads shipments, populates carriers, and filters search safely', async () => {
-    const response = await request(app).get('/api/shipments').query({
+    const response = await agent.get('/api/shipments').query({
       search: 'Northstar (Retail)',
       status: 'at_risk',
     })
@@ -149,7 +213,7 @@ describe('Database-backed shipment API', () => {
   })
 
   it('rejects invalid shipment status filters', async () => {
-    const response = await request(app)
+    const response = await agent
       .get('/api/shipments')
       .query({ status: 'unknown' })
 
@@ -158,7 +222,7 @@ describe('Database-backed shipment API', () => {
   })
 
   it('reads one shipment by normalized tracking number', async () => {
-    const response = await request(app).get('/api/shipments/shp-10482')
+    const response = await agent.get('/api/shipments/shp-10482')
 
     assert.equal(response.status, 200)
     assert.deepEqual(shipmentLookup.filter, { trackingNumber: 'SHP-10482' })
@@ -167,10 +231,10 @@ describe('Database-backed shipment API', () => {
   })
 
   it('rejects invalid and unknown shipment tracking numbers', async () => {
-    const invalidResponse = await request(app).get('/api/shipments/%3Cscript%3E')
+    const invalidResponse = await agent.get('/api/shipments/%3Cscript%3E')
     assert.equal(invalidResponse.status, 400)
 
-    const missingResponse = await request(app).get('/api/shipments/SHP-99999')
+    const missingResponse = await agent.get('/api/shipments/SHP-99999')
 
     assert.equal(missingResponse.status, 404)
     assert.match(missingResponse.body.error, /Shipment not found/)
@@ -184,7 +248,7 @@ describe('Database-backed shipment API', () => {
       carrierId: carrierId.toString(),
       estimatedDelivery: '2026-10-30T12:00:00.000Z',
     }
-    const response = await request(app).post('/api/shipments').send(input)
+    const response = await agent.post('/api/shipments').send(input)
 
     assert.equal(response.status, 201)
     assert.equal(createdPayload.trackingNumber, input.trackingNumber)
@@ -194,7 +258,7 @@ describe('Database-backed shipment API', () => {
   })
 
   it('rejects malformed shipment payloads before database writes', async () => {
-    const response = await request(app)
+    const response = await agent
       .post('/api/shipments')
       .send({ trackingNumber: 'SHP-10502' })
 
@@ -210,7 +274,7 @@ describe('Database-backed shipment API', () => {
       carrierId: carrierId.toString(),
       estimatedDelivery: '2026-10-31T12:00:00.000Z',
     }
-    const response = await request(app)
+    const response = await agent
       .put('/api/shipments/shp-10482')
       .send(input)
 
@@ -232,7 +296,7 @@ describe('Database-backed shipment API', () => {
   })
 
   it('keeps PATCH available as a backward-compatible update method', async () => {
-    const response = await request(app)
+    const response = await agent
       .patch('/api/shipments/shp-10482')
       .send({
         customer: 'Northstar Wholesale',
@@ -246,12 +310,12 @@ describe('Database-backed shipment API', () => {
   })
 
   it('rejects invalid and unknown shipment updates', async () => {
-    const invalidResponse = await request(app)
+    const invalidResponse = await agent
       .put('/api/shipments/%3Cscript%3E')
       .send({})
     assert.equal(invalidResponse.status, 400)
 
-    const missingResponse = await request(app)
+    const missingResponse = await agent
       .put('/api/shipments/SHP-99999')
       .send({
         customer: 'Northstar',
@@ -263,14 +327,14 @@ describe('Database-backed shipment API', () => {
   })
 
   it('deletes an existing shipment and returns not found for a missing one', async () => {
-    const response = await request(app).delete('/api/shipments/shp-10482')
+    const response = await agent.delete('/api/shipments/shp-10482')
 
     assert.equal(response.status, 204)
     assert.deepEqual(shipmentDeletion.filter, {
       trackingNumber: 'SHP-10482',
     })
 
-    const missingResponse = await request(app).delete('/api/shipments/SHP-99999')
+    const missingResponse = await agent.delete('/api/shipments/SHP-99999')
     assert.equal(missingResponse.status, 404)
   })
 
@@ -281,7 +345,7 @@ describe('Database-backed shipment API', () => {
       location: 'Lyon',
       occurredAt: '2026-10-30T12:00:00.000Z',
     }
-    const response = await request(app)
+    const response = await agent
       .post('/api/shipments/shp-10482/events')
       .send(input)
 
@@ -297,7 +361,7 @@ describe('Database-backed shipment API', () => {
   })
 
   it('rejects invalid tracking event payloads', async () => {
-    const response = await request(app)
+    const response = await agent
       .post('/api/shipments/SHP-10482/events')
       .send({ stage: 'teleport', description: '', occurredAt: 'not-a-date' })
 

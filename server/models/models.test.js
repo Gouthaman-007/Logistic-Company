@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import mongoose from 'mongoose'
-import { Carrier, Shipment } from './index.js'
+import { Carrier, Session, Shipment, User } from './index.js'
 
 async function validationErrors(document) {
   try {
@@ -118,5 +118,25 @@ describe('Shipment schema', () => {
     assert.equal(relationship.ref, 'Shipment')
     assert.equal(relationship.localField, '_id')
     assert.equal(relationship.foreignField, 'carrier')
+  })
+})
+
+describe('Authentication schemas', () => {
+  it('stores a derived password hash and verifies credentials', async () => {
+    const user = new User({ username: '  Operations.User  ' })
+    await user.setPassword('correct-horse-battery')
+
+    assert.equal(user.username, 'operations.user')
+    assert.notEqual(user.passwordHash, 'correct-horse-battery')
+    assert.equal(await user.verifyPassword('correct-horse-battery'), true)
+    assert.equal(await user.verifyPassword('incorrect-password'), false)
+    await assert.doesNotReject(user.validate())
+  })
+
+  it('references a user from an expiring session record', () => {
+    assert.equal(Session.schema.path('user').options.ref, 'User')
+    assert.equal(Session.schema.path('tokenHash').options.unique, true)
+    assert.equal(Session.schema.path('expiresAt').options.expires, 0)
+    assert.equal(User.schema.path('passwordHash').options.select, false)
   })
 })
