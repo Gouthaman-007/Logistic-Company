@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import AuthScreen from './components/AuthScreen'
 import BottleneckPanel from './components/BottleneckPanel'
 import CreateShipmentForm from './components/CreateShipmentForm'
 import DeliveryPerformance from './components/DeliveryPerformance'
@@ -102,6 +103,9 @@ async function fetchDashboardData() {
 }
 
 function App() {
+  const [authUser, setAuthUser] = useState(null)
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
+  const [authError, setAuthError] = useState('')
   const [activeItem, setActiveItem] = useState('Overview')
   const [search, setSearch] = useState('')
   const [shipments, setShipments] = useState([])
@@ -133,8 +137,24 @@ function App() {
   useEffect(() => {
     let isActive = true
 
-    async function loadInitialData() {
+    async function loadCurrentUser() {
       try {
+        const response = await fetch('/api/auth/me')
+
+        if (response.status === 401) {
+          return
+        }
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Could not verify your session.')
+        }
+
+        if (isActive) {
+          setAuthUser(result.data)
+        }
+
         const data = await fetchDashboardData()
 
         if (isActive) {
@@ -143,21 +163,50 @@ function App() {
         }
       } catch (requestError) {
         if (isActive) {
-          setError(requestError.message || 'Could not connect to the dashboard API.')
+          setAuthError(
+            requestError.message || 'Could not connect to the authentication API.',
+          )
         }
       } finally {
         if (isActive) {
           setIsLoading(false)
+          setIsAuthLoading(false)
         }
       }
     }
 
-    loadInitialData()
+    loadCurrentUser()
 
     return () => {
       isActive = false
     }
   }, [])
+
+  async function handleAuthenticated(user) {
+    setAuthUser(user)
+    setAuthError('')
+    await loadDashboardData()
+  }
+
+  async function logout() {
+    try {
+      const response = await fetch('/api/auth/logout', { method: 'POST' })
+
+      if (!response.ok) {
+        const result = await response.json()
+        throw new Error(result.error || 'Could not sign out.')
+      }
+
+      setAuthUser(null)
+      setShipments([])
+      setCarriers([])
+      setSelectedShipment(null)
+      setShipmentToEdit(null)
+      setError('')
+    } catch (requestError) {
+      setError(requestError.message || 'Could not sign out.')
+    }
+  }
 
   async function createShipment(values) {
     setError('')
@@ -346,9 +395,31 @@ function App() {
     )
   }, [search, shipments])
 
+  if (isAuthLoading) {
+    return (
+      <main className="auth-loading" aria-live="polite">
+        Checking your session…
+      </main>
+    )
+  }
+
+  if (!authUser) {
+    return (
+      <AuthScreen
+        initialError={authError}
+        onAuthenticated={handleAuthenticated}
+      />
+    )
+  }
+
   return (
     <div className="app-shell">
-      <Sidebar activeItem={activeItem} onNavigate={setActiveItem} />
+      <Sidebar
+        activeItem={activeItem}
+        onLogout={logout}
+        onNavigate={setActiveItem}
+        username={authUser.username}
+      />
       <main className="main-content">
         <Topbar activeItem={activeItem} />
         <div className="content-wrap">

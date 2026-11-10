@@ -6,7 +6,13 @@ const navigation = [
   { label: 'Analytics', icon: '◷' },
 ]
 
-function Sidebar({ activeItem, onNavigate }) {
+function Sidebar({ activeItem, onNavigate, onLogout, username }) {
+  const initials = username
+    .split(/[._-]/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('')
+
   return (
     <aside className="sidebar">
       <a className="brand" href="#overview" aria-label="Haulwise home">
@@ -47,14 +53,14 @@ function Sidebar({ activeItem, onNavigate }) {
         </button>
         <div className="user-card">
           <div className="avatar" aria-hidden="true">
-            AS
+            {initials}
           </div>
           <div className="user-details">
-            <strong>Alex Smith</strong>
-            <span>Operations lead</span>
+            <strong>{username}</strong>
+            <span>Signed in</span>
           </div>
-          <button className="more-button" type="button" aria-label="User menu">
-            ···
+          <button className="sign-out-button" onClick={onLogout} type="button">
+            Sign out
           </button>
         </div>
       </div>

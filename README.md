@@ -22,6 +22,22 @@ without connecting to a database:
 npm run test:models
 ```
 
+## Username and password authentication
+
+Create an account from the sign-in screen using a username and a password of at
+least 12 characters. Passwords are stored as salted scrypt hashes. Successful
+registration and login create a seven-day MongoDB session; the browser receives
+only an HttpOnly, SameSite cookie, and signing out revokes the stored session.
+Shipment and carrier API routes require an active session. Account registration
+is open to users who can reach the application.
+
+Authentication endpoints:
+
+- `POST /api/auth/register` creates an account and signs it in.
+- `POST /api/auth/login` verifies credentials and starts a session.
+- `GET /api/auth/me` returns the current account.
+- `POST /api/auth/logout` revokes the current session.
+
 ## Database-backed API
 
 Copy `.env.example` to `.env` and set `MONGODB_URI` to a MongoDB database you
@@ -44,6 +60,8 @@ npm run dev
 ```
 
 The API listens on port `3001` by default. Vite proxies `/api` requests to it.
+Open registration is suitable for this capstone demo; restrict account creation
+before exposing the dashboard to an untrusted network.
 The seed script upserts example carriers and shipments and can be run again
 safely.
 

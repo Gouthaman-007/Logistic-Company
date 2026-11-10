@@ -1,6 +1,14 @@
 import express from 'express'
 import mongoose from 'mongoose'
-import { Carrier, Shipment } from '../models/index.js'
+import { Carrier, Session, Shipment, User } from '../models/index.js'
+import {
+  clearSessionCookie,
+  createSessionToken,
+  hashSessionToken,
+  readSessionToken,
+  sessionLifetimeSeconds,
+  setSessionCookie,
+} from '../auth/session.js'
 
 const shipmentStatuses = [
   'on_track',
@@ -35,7 +43,9 @@ function validString(value) {
 
 export function createApp({
   CarrierModel = Carrier,
+  SessionModel = Session,
   ShipmentModel = Shipment,
+  UserModel = User,
   getDatabaseState = () => mongoose.connection.readyState,
 } = {}) {
   const app = express()
@@ -51,6 +61,121 @@ export function createApp({
       database: databaseConnected ? 'connected' : 'disconnected',
     })
   })
+
+  const authenticate = async (request, response, next) => {
+    const token = readSessionToken(request)
+
+    if (!token) {
+      response.status(401).json({ error: 'Authentication required.' })
+      return
+    }
+
+    const session = await SessionModel.findOne({
+      tokenHash: hashSessionToken(token),
+      expiresAt: { $gt: new Date() },
+    }).populate('user', 'username')
+
+    if (!session?.user) {
+      response.status(401).json({ error: 'Authentication required.' })
+      return
+    }
+
+    request.authUser = {
+      id: session.user._id.toString(),
+      username: session.user.username,
+    }
+    next()
+  }
+
+  async function createAuthenticatedSession(user, response) {
+    const token = createSessionToken()
+
+    await SessionModel.create({
+      user: user._id,
+      tokenHash: hashSessionToken(token),
+      expiresAt: new Date(Date.now() + sessionLifetimeSeconds * 1000),
+    })
+    setSessionCookie(response, token)
+
+    return {
+      id: user._id.toString(),
+      username: user.username,
+    }
+  }
+
+  app.post('/api/auth/register', async (request, response) => {
+    const { username, password } = request.body ?? {}
+    const normalizedUsername =
+      typeof username === 'string' ? username.trim().toLowerCase() : ''
+
+    if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(normalizedUsername)) {
+      throw createHttpError(
+        400,
+        'Username must be 3-32 characters and use letters, numbers, dots, underscores, or hyphens.',
+      )
+    }
+
+    if (
+      typeof password !== 'string' ||
+      password.length < 12 ||
+      password.length > 128
+    ) {
+      throw createHttpError(400, 'Password must be between 12 and 128 characters.')
+    }
+
+    const user = await UserModel.createWithPassword(
+      normalizedUsername,
+      password,
+    )
+    const data = await createAuthenticatedSession(user, response)
+
+    response.status(201).json({ data })
+  })
+
+  app.post('/api/auth/login', async (request, response) => {
+    const { username, password } = request.body ?? {}
+
+    if (
+      typeof username !== 'string' ||
+      typeof password !== 'string' ||
+      !username.trim() ||
+      !password ||
+      password.length > 128
+    ) {
+      throw createHttpError(400, 'Username and password are required.')
+    }
+
+    const user = await UserModel.findOne({
+      username: username.trim().toLowerCase(),
+    }).select('+passwordHash')
+
+    if (!user || !(await user.verifyPassword(password))) {
+      throw createHttpError(401, 'Invalid username or password.')
+    }
+
+    const data = await createAuthenticatedSession(user, response)
+
+    response.json({ data })
+  })
+
+  app.get('/api/auth/me', authenticate, (request, response) => {
+    response.json({ data: request.authUser })
+  })
+
+  app.post('/api/auth/logout', async (request, response) => {
+    const token = readSessionToken(request)
+
+    if (token) {
+      await SessionModel.findOneAndDelete({
+        tokenHash: hashSessionToken(token),
+      })
+    }
+
+    clearSessionCookie(response)
+    response.status(204).end()
+  })
+
+  app.use('/api', authenticate)
 
   app.get('/api/carriers', async (request, response) => {
     const carriers = await CarrierModel.find({ isActive: true })
