@@ -26,8 +26,9 @@ npm run test:models
 
 Create an account from the sign-in screen using a username and a password of at
 least 12 characters. Passwords are stored as salted scrypt hashes. Successful
-registration and login create a seven-day MongoDB session; the browser receives
-only an HttpOnly, SameSite cookie, and signing out revokes the stored session.
+registration and login create a signed HS256 JWT with a seven-day expiry. The
+JWT is stored in an HttpOnly, SameSite cookie, and its identifier is backed by
+a MongoDB session record so signing out revokes it immediately.
 Shipment and carrier API routes require an active session. Account registration
 is open to users who can reach the application.
 
@@ -40,8 +41,10 @@ Authentication endpoints:
 
 ## Database-backed API
 
-Copy `.env.example` to `.env` and set `MONGODB_URI` to a MongoDB database you
-can access. Keep `.env` private; it is ignored by Git.
+Copy `.env.example` to `.env`, set `MONGODB_URI`, and set `JWT_SECRET` to a
+cryptographically random value of at least 32 bytes. For example, generate one
+with `node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"`.
+Keep `.env` private; it is ignored by Git.
 
 Install the root API dependencies and seed the database:
 

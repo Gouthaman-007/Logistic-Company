@@ -2,13 +2,15 @@ import express from 'express'
 import mongoose from 'mongoose'
 import { Carrier, Session, Shipment, User } from '../models/index.js'
 import {
-  clearSessionCookie,
-  createSessionToken,
-  hashSessionToken,
-  readSessionToken,
-  sessionLifetimeSeconds,
-  setSessionCookie,
-} from '../auth/session.js'
+  accessTokenLifetimeSeconds,
+  assertJwtSecret,
+  clearAccessTokenCookie,
+  createAccessToken,
+  hashJwtId,
+  readAccessToken,
+  setAccessTokenCookie,
+  verifyAccessToken,
+} from '../auth/jwt.js'
 
 const shipmentStatuses = [
   'on_track',
@@ -46,8 +48,11 @@ export function createApp({
   SessionModel = Session,
   ShipmentModel = Shipment,
   UserModel = User,
+  jwtSecret = process.env.JWT_SECRET,
   getDatabaseState = () => mongoose.connection.readyState,
 } = {}) {
+  assertJwtSecret(jwtSecret)
+
   const app = express()
 
   app.disable('x-powered-by')
@@ -63,15 +68,23 @@ export function createApp({
   })
 
   const authenticate = async (request, response, next) => {
-    const token = readSessionToken(request)
+    const token = readAccessToken(request)
 
     if (!token) {
       response.status(401).json({ error: 'Authentication required.' })
       return
     }
 
+    const claims = verifyAccessToken(token, jwtSecret)
+
+    if (!claims) {
+      response.status(401).json({ error: 'Authentication required.' })
+      return
+    }
+
     const session = await SessionModel.findOne({
-      tokenHash: hashSessionToken(token),
+      user: claims.userId,
+      tokenHash: hashJwtId(claims.jwtId),
       expiresAt: { $gt: new Date() },
     }).populate('user', 'username')
 
@@ -88,14 +101,14 @@ export function createApp({
   }
 
   async function createAuthenticatedSession(user, response) {
-    const token = createSessionToken()
+    const { token, jwtId } = createAccessToken(user._id, jwtSecret)
 
     await SessionModel.create({
       user: user._id,
-      tokenHash: hashSessionToken(token),
-      expiresAt: new Date(Date.now() + sessionLifetimeSeconds * 1000),
+      tokenHash: hashJwtId(jwtId),
+      expiresAt: new Date(Date.now() + accessTokenLifetimeSeconds * 1000),
     })
-    setSessionCookie(response, token)
+    setAccessTokenCookie(response, token)
 
     return {
       id: user._id.toString(),
@@ -163,15 +176,17 @@ export function createApp({
   })
 
   app.post('/api/auth/logout', async (request, response) => {
-    const token = readSessionToken(request)
+    const token = readAccessToken(request)
+    const claims = token ? verifyAccessToken(token, jwtSecret) : null
 
-    if (token) {
+    if (claims) {
       await SessionModel.findOneAndDelete({
-        tokenHash: hashSessionToken(token),
+        user: claims.userId,
+        tokenHash: hashJwtId(claims.jwtId),
       })
     }
 
-    clearSessionCookie(response)
+    clearAccessTokenCookie(response)
     response.status(204).end()
   })
 
