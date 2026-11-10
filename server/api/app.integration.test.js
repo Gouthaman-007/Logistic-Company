@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 import mongoose from 'mongoose'
+import jwt from 'jsonwebtoken'
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import request from 'supertest'
 import { createApp } from './app.js'
 import { connectToDatabase } from '../db/connect.js'
+import {
+  accessTokenAudience,
+  accessTokenIssuer,
+  hashJwtId,
+} from '../auth/jwt.js'
 import { Carrier, Session, Shipment, User } from '../models/index.js'
 
+const jwtSecret = 'integration-secret-with-more-than-thirty-two-bytes'
 let database
 let app
 let agent
@@ -21,7 +28,7 @@ before(async () => {
     code: 'DHLF',
     serviceTypes: ['ground'],
   })
-  app = createApp()
+  app = createApp({ jwtSecret })
   agent = request.agent(app)
   const registration = await agent
     .post('/api/auth/register')
@@ -35,25 +42,60 @@ after(async () => {
 })
 
 describe('MongoDB shipment read and write flow', () => {
-  it('registers, authenticates, and revokes username/password sessions', async () => {
+  it('issues, authenticates, and revokes signed JWTs', async () => {
     const registrationAgent = request.agent(app)
     const registration = await registrationAgent
       .post('/api/auth/register')
       .send({ username: 'second-user', password: 'another-correct-password' })
     assert.equal(registration.status, 201)
     assert.equal(registration.body.data.username, 'second-user')
-    assert.match(registration.headers['set-cookie'][0], /HttpOnly/)
+    const cookie = registration.headers['set-cookie'][0]
+    assert.match(cookie, /HttpOnly/)
+    assert.match(cookie, /SameSite=Strict/)
+    const accessToken = cookie.match(/haulwise_access_token=([^;]+)/)[1]
+    const claims = jwt.verify(accessToken, jwtSecret, {
+      algorithms: ['HS256'],
+      audience: accessTokenAudience,
+      issuer: accessTokenIssuer,
+    })
+    assert.equal(claims.sub, registration.body.data.id)
+    assert.ok(claims.exp > claims.iat)
 
     const storedUser = await User.findOne({ username: 'second-user' })
       .select('+passwordHash')
     assert.notEqual(storedUser.passwordHash, 'another-correct-password')
     assert.notEqual(
       storedUser.passwordHash,
-      registration.headers['set-cookie'][0].match(/haulwise_session=([^;]+)/)[1],
+      accessToken,
     )
 
     const anonymousResponse = await request(app).get('/api/shipments')
     assert.equal(anonymousResponse.status, 401)
+
+    const storedSession = await Session.findOne({
+      user: registration.body.data.id,
+      tokenHash: hashJwtId(claims.jti),
+    })
+    assert.ok(storedSession)
+
+    const tamperedToken = `${accessToken.slice(0, -1)}${accessToken.endsWith('a') ? 'b' : 'a'}`
+    const tamperedResponse = await request(app)
+      .get('/api/shipments')
+      .set('Cookie', `haulwise_access_token=${tamperedToken}`)
+    assert.equal(tamperedResponse.status, 401)
+
+    const expiredToken = jwt.sign({}, jwtSecret, {
+      algorithm: 'HS256',
+      audience: accessTokenAudience,
+      expiresIn: -1,
+      issuer: accessTokenIssuer,
+      jwtid: 'expired-token-id',
+      subject: registration.body.data.id,
+    })
+    const expiredResponse = await request(app)
+      .get('/api/shipments')
+      .set('Cookie', `haulwise_access_token=${expiredToken}`)
+    assert.equal(expiredResponse.status, 401)
 
     const loginAgent = request.agent(app)
     const invalidLogin = await loginAgent
@@ -83,6 +125,13 @@ describe('MongoDB shipment read and write flow', () => {
 
     assert.equal(response.status, 400)
     assert.match(response.body.error, /Username must/)
+  })
+
+  it('requires a strong JWT signing secret', () => {
+    assert.throws(
+      () => createApp({ jwtSecret: 'too-short' }),
+      /JWT_SECRET must be set/,
+    )
   })
 
   it('reads carriers, creates a shipment, then reads it from MongoDB', async () => {

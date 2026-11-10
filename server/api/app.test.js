@@ -6,6 +6,7 @@ import { createApp } from './app.js'
 
 const carrierId = new mongoose.Types.ObjectId()
 const carrier = { _id: carrierId, name: 'DHL Freight', code: 'DHLF' }
+const testJwtSecret = 'test-secret-with-more-than-thirty-two-bytes'
 const testUser = {
   _id: new mongoose.Types.ObjectId(),
   username: 'api-test',
@@ -43,6 +44,7 @@ function createQuery(result, selectedFields) {
 
 before(async () => {
   app = createApp({
+    jwtSecret: testJwtSecret,
     getDatabaseState: () => 1,
     UserModel: {
       async createWithPassword(username) {
@@ -170,6 +172,11 @@ describe('Database-backed shipment API', () => {
       id: testUser._id.toString(),
       username: 'api-test',
     })
+
+    const invalidTokenResponse = await request(app)
+      .get('/api/shipments')
+      .set('Cookie', 'haulwise_access_token=not.a.valid.signature')
+    assert.equal(invalidTokenResponse.status, 401)
   })
 
   it('rejects invalid credentials without creating a session', async () => {
