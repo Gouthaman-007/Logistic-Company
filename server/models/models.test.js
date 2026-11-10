@@ -111,4 +111,12 @@ describe('Shipment schema', () => {
     assert.equal(Shipment.schema.path('trackingNumber').options.unique, true)
     assert.equal(Carrier.schema.path('code').options.unique, true)
   })
+
+  it('exposes shipments as a one-to-many virtual relationship', () => {
+    const relationship = Carrier.schema.virtuals.shipments.options
+
+    assert.equal(relationship.ref, 'Shipment')
+    assert.equal(relationship.localField, '_id')
+    assert.equal(relationship.foreignField, 'carrier')
+  })
 })

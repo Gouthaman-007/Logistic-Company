@@ -57,6 +57,12 @@ const carrierSchema = new mongoose.Schema(
   },
 )
 
+carrierSchema.virtual('shipments', {
+  ref: 'Shipment',
+  localField: '_id',
+  foreignField: 'carrier',
+})
+
 const Carrier =
   mongoose.models.Carrier || mongoose.model('Carrier', carrierSchema)
 

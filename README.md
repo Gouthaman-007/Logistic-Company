@@ -8,9 +8,11 @@ performance, and logistics bottlenecks.
 Mongoose models are defined in `server/models`:
 
 - `Carrier` stores carrier identifiers, contact details, service coverage, and
-  performance metrics.
+  performance metrics, and exposes its related shipments through a virtual
+  one-to-many relationship.
 - `Shipment` stores customer and route details, delivery status and dates,
-  tracking events, and a reference to its carrier.
+  tracking events, and a required reference to its carrier. Populate
+  `Carrier.shipments` to read the shipments assigned to a carrier.
 
 Schemas validate required fields, enums, and metric ranges. Shipment indexes
 support status/ETA and carrier/ETA lookups. Run the schema validation tests
