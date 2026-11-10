@@ -162,6 +162,15 @@ before(async () => {
 })
 
 describe('Database-backed shipment API', () => {
+  it('reports whether Google sign-in is configured', async () => {
+    const providersResponse = await request(app).get('/api/auth/providers')
+    assert.equal(providersResponse.status, 200)
+    assert.deepEqual(providersResponse.body.data, { google: false })
+
+    const unavailableResponse = await request(app).get('/api/auth/google')
+    assert.equal(unavailableResponse.status, 503)
+  })
+
   it('requires authentication and exposes the signed-in user', async () => {
     const anonymousResponse = await request(app).get('/api/shipments')
     assert.equal(anonymousResponse.status, 401)

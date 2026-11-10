@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { after, before, describe, it } from 'node:test'
 import mongoose from 'mongoose'
 import jwt from 'jsonwebtoken'
@@ -18,6 +19,13 @@ let database
 let app
 let agent
 let carrier
+let googleOAuthState
+const googleOAuthConfig = {
+  clientId: 'test-google-client-id',
+  clientSecret: 'test-google-client-secret',
+  callbackUrl: 'http://localhost:5173/api/auth/google/callback',
+  successRedirectUrl: 'http://localhost:5173/',
+}
 
 before(async () => {
   database = await MongoMemoryServer.create()
@@ -28,7 +36,25 @@ before(async () => {
     code: 'DHLF',
     serviceTypes: ['ground'],
   })
-  app = createApp({ jwtSecret })
+  app = createApp({
+    jwtSecret,
+    googleOAuthConfig,
+    exchangeGoogleCodeImplementation: async ({ code, codeVerifier }) => {
+      assert.equal(code, 'google-authorization-code')
+      assert.equal(codeVerifier, googleOAuthState.codeVerifier)
+      return 'verified-google-id-token'
+    },
+    verifyGoogleIdentityImplementation: async ({ idToken, nonce, clientId }) => {
+      assert.equal(idToken, 'verified-google-id-token')
+      assert.equal(nonce, googleOAuthState.nonce)
+      assert.equal(clientId, googleOAuthConfig.clientId)
+      return {
+        googleSubject: 'google-subject-123',
+        email: 'google.user@example.com',
+        displayName: 'Google User',
+      }
+    },
+  })
   agent = request.agent(app)
   const registration = await agent
     .post('/api/auth/register')
@@ -42,6 +68,75 @@ after(async () => {
 })
 
 describe('MongoDB shipment read and write flow', () => {
+  it('authenticates Google users using state, nonce, and PKCE', async () => {
+    const googleAgent = request.agent(app)
+    const authorization = await googleAgent.get('/api/auth/google')
+
+    assert.equal(authorization.status, 302)
+    const authorizationUrl = new URL(authorization.headers.location)
+    assert.equal(authorizationUrl.origin, 'https://accounts.google.com')
+    assert.equal(authorizationUrl.searchParams.get('client_id'), googleOAuthConfig.clientId)
+    assert.equal(authorizationUrl.searchParams.get('scope'), 'openid email profile')
+    assert.equal(authorizationUrl.searchParams.get('code_challenge_method'), 'S256')
+
+    googleOAuthState = {
+      state: authorizationUrl.searchParams.get('state'),
+      nonce: authorizationUrl.searchParams.get('nonce'),
+      codeVerifier: '',
+    }
+    const stateCookie = authorization.headers['set-cookie']
+      .find((cookie) => cookie.startsWith('haulwise_google_oauth='))
+    assert.ok(stateCookie)
+    const encodedState = stateCookie.match(/haulwise_google_oauth=([^;]+)/)[1]
+    googleOAuthState = JSON.parse(
+      Buffer.from(encodedState, 'base64url').toString('utf8'),
+    )
+    assert.equal(
+      authorizationUrl.searchParams.get('code_challenge'),
+      createHash('sha256')
+        .update(googleOAuthState.codeVerifier)
+        .digest('base64url'),
+    )
+
+    const callback = await googleAgent
+      .get('/api/auth/google/callback')
+      .query({
+        code: 'google-authorization-code',
+        state: googleOAuthState.state,
+      })
+    assert.equal(callback.status, 302)
+    assert.equal(callback.headers.location, googleOAuthConfig.successRedirectUrl)
+    assert.ok(
+      callback.headers['set-cookie'].some((cookie) =>
+        cookie.startsWith('haulwise_access_token='),
+      ),
+    )
+
+    const user = await User.findOne({
+      googleSubject: 'google-subject-123',
+    })
+    assert.ok(user)
+    assert.equal(user.email, 'google.user@example.com')
+    assert.equal(user.displayName, 'Google User')
+    assert.equal(await user.verifyPassword('not-a-password'), false)
+
+    const currentUser = await googleAgent.get('/api/auth/me')
+    assert.equal(currentUser.status, 200)
+    assert.equal(currentUser.body.data.id, user._id.toString())
+  })
+
+  it('rejects a Google callback with mismatched state', async () => {
+    const googleAgent = request.agent(app)
+    await googleAgent.get('/api/auth/google')
+
+    const response = await googleAgent
+      .get('/api/auth/google/callback')
+      .query({ code: 'google-authorization-code', state: 'wrong-state' })
+
+    assert.equal(response.status, 400)
+    assert.match(response.body.error, /state is invalid/)
+  })
+
   it('issues, authenticates, and revokes signed JWTs', async () => {
     const registrationAgent = request.agent(app)
     const registration = await registrationAgent

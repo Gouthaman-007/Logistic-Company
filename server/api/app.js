@@ -11,6 +11,17 @@ import {
   setAccessTokenCookie,
   verifyAccessToken,
 } from '../auth/jwt.js'
+import {
+  clearGoogleOAuthStateCookie,
+  createGoogleAuthorizationUrl,
+  createGoogleOAuthState,
+  exchangeGoogleCode,
+  isGoogleOAuthConfigured,
+  matchesGoogleOAuthState,
+  readGoogleOAuthState,
+  setGoogleOAuthStateCookie,
+  verifyGoogleIdentity,
+} from '../auth/google.js'
 
 const shipmentStatuses = [
   'on_track',
@@ -49,6 +60,15 @@ export function createApp({
   ShipmentModel = Shipment,
   UserModel = User,
   jwtSecret = process.env.JWT_SECRET,
+  googleOAuthConfig = {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackUrl: process.env.GOOGLE_CALLBACK_URL,
+    successRedirectUrl: process.env.GOOGLE_SUCCESS_REDIRECT_URL,
+  },
+  fetchImplementation = fetch,
+  exchangeGoogleCodeImplementation = exchangeGoogleCode,
+  verifyGoogleIdentityImplementation = verifyGoogleIdentity,
   getDatabaseState = () => mongoose.connection.readyState,
 } = {}) {
   assertJwtSecret(jwtSecret)
@@ -169,6 +189,97 @@ export function createApp({
     const data = await createAuthenticatedSession(user, response)
 
     response.json({ data })
+  })
+
+  app.get('/api/auth/providers', (request, response) => {
+    response.json({
+      data: { google: isGoogleOAuthConfigured(googleOAuthConfig) },
+    })
+  })
+
+  app.get('/api/auth/google', (request, response) => {
+    if (!isGoogleOAuthConfigured(googleOAuthConfig)) {
+      response.status(503).json({
+        error: 'Google sign-in is not configured on this server.',
+      })
+      return
+    }
+
+    const state = createGoogleOAuthState()
+    setGoogleOAuthStateCookie(response, state)
+    response.redirect(createGoogleAuthorizationUrl(googleOAuthConfig, state))
+  })
+
+  app.get('/api/auth/google/callback', async (request, response) => {
+    if (!isGoogleOAuthConfigured(googleOAuthConfig)) {
+      response.status(503).json({
+        error: 'Google sign-in is not configured on this server.',
+      })
+      return
+    }
+
+    const savedState = readGoogleOAuthState(request)
+    clearGoogleOAuthStateCookie(response)
+
+    if (
+      !savedState ||
+      typeof request.query.state !== 'string' ||
+      !matchesGoogleOAuthState(savedState.state, request.query.state)
+    ) {
+      response.status(400).json({ error: 'Google sign-in state is invalid.' })
+      return
+    }
+
+    if (typeof request.query.error === 'string') {
+      response.status(401).json({ error: 'Google sign-in was not completed.' })
+      return
+    }
+
+    if (typeof request.query.code !== 'string' || !request.query.code) {
+      response.status(400).json({ error: 'Google authorization code is required.' })
+      return
+    }
+
+    try {
+      const idToken = await exchangeGoogleCodeImplementation({
+        code: request.query.code,
+        codeVerifier: savedState.codeVerifier,
+        config: googleOAuthConfig,
+        fetchImplementation,
+      })
+      const identity = await verifyGoogleIdentityImplementation({
+        idToken,
+        nonce: savedState.nonce,
+        clientId: googleOAuthConfig.clientId,
+      })
+      let user = await UserModel.findOne({
+        googleSubject: identity.googleSubject,
+      })
+
+      if (!user) {
+        try {
+          user = await UserModel.createWithGoogleIdentity(identity)
+        } catch (error) {
+          if (error.code !== 11000) {
+            throw error
+          }
+
+          user = await UserModel.findOne({
+            googleSubject: identity.googleSubject,
+          })
+
+          if (!user) {
+            throw error
+          }
+        }
+      }
+
+      await createAuthenticatedSession(user, response)
+      response.redirect(googleOAuthConfig.successRedirectUrl)
+    } catch (error) {
+      console.error('Google sign-in failed:', error)
+      response.status(502).json({ error: 'Google sign-in could not be completed.' })
+    }
   })
 
   app.get('/api/auth/me', authenticate, (request, response) => {

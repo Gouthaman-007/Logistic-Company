@@ -139,4 +139,18 @@ describe('Authentication schemas', () => {
     assert.equal(Session.schema.path('expiresAt').options.expires, 0)
     assert.equal(User.schema.path('passwordHash').options.select, false)
   })
+
+  it('supports Google-only accounts without a local password', async () => {
+    const user = new User({
+      username: `g${'a'.repeat(30)}`,
+      googleSubject: 'google-subject',
+      email: 'person@example.com',
+      displayName: 'Google User',
+    })
+
+    assert.equal(await user.verifyPassword('any-password'), false)
+    assert.equal(User.schema.path('googleSubject').options.unique, true)
+    assert.equal(User.schema.path('googleSubject').options.sparse, true)
+    await assert.doesNotReject(user.validate())
+  })
 })

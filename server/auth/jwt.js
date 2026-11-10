@@ -85,9 +85,15 @@ export function readAccessToken(request) {
 
 export function setAccessTokenCookie(response, token) {
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+  const cookie =
+    `${accessTokenCookieName}=${token}; HttpOnly; SameSite=Strict; Path=/api; Max-Age=${accessTokenLifetimeSeconds}${secure}`
+  const existingCookies = response.getHeader('Set-Cookie')
+
   response.setHeader(
     'Set-Cookie',
-    `${accessTokenCookieName}=${token}; HttpOnly; SameSite=Strict; Path=/api; Max-Age=${accessTokenLifetimeSeconds}${secure}`,
+    existingCookies
+      ? [...(Array.isArray(existingCookies) ? existingCookies : [existingCookies]), cookie]
+      : cookie,
   )
 }
 

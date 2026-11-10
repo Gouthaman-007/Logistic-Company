@@ -36,8 +36,21 @@ Authentication endpoints:
 
 - `POST /api/auth/register` creates an account and signs it in.
 - `POST /api/auth/login` verifies credentials and starts a session.
+- `GET /api/auth/google` starts Google OpenID Connect sign-in when configured.
+- `GET /api/auth/google/callback` validates Google's response and signs in the
+  verified account.
 - `GET /api/auth/me` returns the current account.
 - `POST /api/auth/logout` revokes the current session.
+
+To enable Google sign-in, create an OAuth 2.0 Web application client in Google
+Cloud Console. Add the exact value of `GOOGLE_CALLBACK_URL` to its authorized
+redirect URIs, then set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+`GOOGLE_CALLBACK_URL`, and `GOOGLE_SUCCESS_REDIRECT_URL` in `.env`. For local
+development, the callback URL should use the Vite origin so the authentication
+cookie is available to the client through its `/api` proxy. Google sign-in
+validates the signed ID token, verified email, nonce, state, and PKCE verifier.
+Google-only accounts are linked by Google's immutable subject ID; they are not
+silently linked to an existing password account by email.
 
 ## Database-backed API
 
