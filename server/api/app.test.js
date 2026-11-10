@@ -211,7 +211,7 @@ describe('Database-backed shipment API', () => {
       estimatedDelivery: '2026-10-31T12:00:00.000Z',
     }
     const response = await request(app)
-      .patch('/api/shipments/shp-10482')
+      .put('/api/shipments/shp-10482')
       .send(input)
 
     assert.equal(response.status, 200)
@@ -231,14 +231,28 @@ describe('Database-backed shipment API', () => {
     assert.equal(response.body.data.customer, input.customer)
   })
 
+  it('keeps PATCH available as a backward-compatible update method', async () => {
+    const response = await request(app)
+      .patch('/api/shipments/shp-10482')
+      .send({
+        customer: 'Northstar Wholesale',
+        route: { origin: 'Rotterdam', destination: 'Paris' },
+        carrierId: carrierId.toString(),
+        estimatedDelivery: '2026-10-31T12:00:00.000Z',
+      })
+
+    assert.equal(response.status, 200)
+    assert.equal(response.body.data.customer, 'Northstar Wholesale')
+  })
+
   it('rejects invalid and unknown shipment updates', async () => {
     const invalidResponse = await request(app)
-      .patch('/api/shipments/%3Cscript%3E')
+      .put('/api/shipments/%3Cscript%3E')
       .send({})
     assert.equal(invalidResponse.status, 400)
 
     const missingResponse = await request(app)
-      .patch('/api/shipments/SHP-99999')
+      .put('/api/shipments/SHP-99999')
       .send({
         customer: 'Northstar',
         route: { origin: 'Rotterdam', destination: 'Paris' },

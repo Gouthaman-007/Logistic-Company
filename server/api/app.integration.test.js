@@ -52,6 +52,14 @@ describe('MongoDB shipment read and write flow', () => {
     assert.equal(createResponse.body.data.carrier.name, 'DHL Freight')
     assert.equal(createResponse.body.data.status, 'on_track')
 
+    const carrierWithShipments = await Carrier.findById(carrier._id)
+      .populate('shipments', 'trackingNumber customer')
+    assert.ok(
+      carrierWithShipments.shipments.some(
+        (shipment) => shipment.trackingNumber === 'SHP-REAL-1',
+      ),
+    )
+
     const readResponse = await request(app)
       .get('/api/shipments')
       .query({ search: 'SHP-REAL-1' })
@@ -102,7 +110,7 @@ describe('MongoDB shipment read and write flow', () => {
     })
 
     const updateResponse = await request(app)
-      .patch('/api/shipments/SHP-CRUD-1')
+      .put('/api/shipments/SHP-CRUD-1')
       .send({
         customer: 'Atlas Health',
         route: { origin: 'Rotterdam', destination: 'Paris' },

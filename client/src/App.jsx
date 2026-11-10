@@ -216,7 +216,7 @@ function App() {
       const response = await fetch(
         `/api/shipments/${encodeURIComponent(trackingNumber)}`,
         {
-          method: 'PATCH',
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(values),
         },
