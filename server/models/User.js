@@ -1,4 +1,9 @@
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
+import {
+  createHash,
+  randomBytes,
+  scrypt as scryptCallback,
+  timingSafeEqual,
+} from 'node:crypto'
 import { promisify } from 'node:util'
 import mongoose from 'mongoose'
 
@@ -19,8 +24,21 @@ const userSchema = new mongoose.Schema(
     },
     passwordHash: {
       type: String,
-      required: true,
       select: false,
+    },
+    googleSubject: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+    },
+    displayName: {
+      type: String,
+      trim: true,
     },
   },
   {
@@ -34,6 +52,19 @@ userSchema.statics.createWithPassword = async function (username, password) {
   await user.setPassword(password)
   await user.save()
   return user
+}
+
+userSchema.statics.createWithGoogleIdentity = async function ({
+  googleSubject,
+  email,
+  displayName,
+}) {
+  const username = `g${createGoogleUsernameHash(googleSubject)}`
+  return this.create({ username, googleSubject, email, displayName })
+}
+
+function createGoogleUsernameHash(googleSubject) {
+  return createHash('sha256').update(googleSubject).digest('hex').slice(0, 30)
 }
 
 userSchema.methods.setPassword = async function (password) {
